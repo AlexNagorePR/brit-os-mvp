@@ -9,16 +9,14 @@ import {
 } from "lucide-react";
 import HUDPanel from "./HUDPanel";
 import HUDButton from "./HUDButton";
-import Joystick from "./Joystick";
+import AlarmPanel from "./AlarmPanel";
 
 export default function RightPanel({
   isRightPanelOpen,
   setIsRightPanelOpen,
 
   activeRobot,
-  controlType,
-  setControlType,
-  setMoveVector,
+  alarms = [],
 
   addLog,
 }) {
@@ -45,14 +43,14 @@ export default function RightPanel({
             <div className="flex justify-between items-center text-[8px] uppercase font-bold text-zinc-500">
               <span>Estado</span>
               <span className="text-emerald-500 tracking-wider font-black">
-                {activeRobot.health}
+                {activeRobot.health != null ? activeRobot.health : '-'}
               </span>
             </div>
 
             <div className="space-y-1">
               <div className="flex justify-between items-center text-[8px] uppercase font-bold text-zinc-500">
-                <span>Carga</span>
-                <span className="text-white">{activeRobot.load.toFixed(0)}%</span>
+                <span>Progreso tarea</span>
+                <span className="text-white">{activeRobot.load != null ? activeRobot.load.toFixed(0) : '-'}%</span>
               </div>
               <div className="w-full h-1 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
                 <div
@@ -61,68 +59,87 @@ export default function RightPanel({
                 />
               </div>
             </div>
+
+            <div className="flex justify-between items-center text-[8px] uppercase font-bold text-zinc-500">
+              <span>Estado</span>
+              <span className="text-emerald-500 tracking-wider font-black">
+                {activeRobot.health != null ? activeRobot.health : '-'}
+              </span>
+            </div>
           </div>
         </HUDPanel>
 
         <div className="grid grid-cols-2 gap-2">
           <div className="aspect-square bg-zinc-900 border border-zinc-700 rounded-sm flex flex-col items-center justify-center gap-1 shadow-inner group">
+            <span>Brit Battery</span>
             <Battery
               size={20}
               className={
-                activeRobot.battery < 20
+                activeRobot.battery != null && activeRobot.battery < 20
                   ? "text-red-500 animate-pulse"
                   : "text-emerald-500"
               }
             />
             <span className="text-[12px] font-black text-white">
-              {activeRobot.battery.toFixed(0)}%
+              {activeRobot.battery != null
+                ? activeRobot.battery.toFixed(0)
+                : '-'}%
+            </span>
+            <span className="text-[12px] font-black text-white">
+              {activeRobot.voltage != null
+                ? activeRobot.voltage.toFixed(0)
+                : '-'}V
             </span>
           </div>
 
           <div className="aspect-square bg-zinc-900 border border-zinc-700 rounded-sm flex flex-col items-center justify-center gap-1 shadow-inner">
-            <Droplet size={20} className="text-blue-500" />
+            <span>Ink level</span>
+            <Droplet
+              size={20}
+              className="text-blue-500"
+            />
             <span className="text-[12px] font-black text-white">
-              {activeRobot.ink}%
+              {activeRobot.ink != null
+                ? activeRobot.ink : '-'}
+            </span>
+          </div>
+
+          <div className="aspect-square bg-zinc-900 border border-zinc-700 rounded-sm flex flex-col items-center justify-center gap-1 shadow-inner group">
+            <span>Leica Battery</span>
+            <Battery
+              size={20}
+              className={
+                activeRobot.leicaBattery != null && activeRobot.leicaBattery < 20
+                  ? "text-red-500 animate-pulse"
+                  : "text-emerald-500"
+              }
+            />
+            <span className="text-[12px] font-black text-white">
+              {activeRobot.leicaBattery != null
+                ? activeRobot.leicaBattery.toFixed(0)
+                : '-'}%
+            </span>
+          </div>
+
+          <div className="aspect-square bg-zinc-900 border border-zinc-700 rounded-sm flex flex-col items-center justify-center gap-1 shadow-inner group">
+            <span>Topcon Battery</span>
+            <Battery
+              size={20}
+              className={
+                activeRobot.topconBattery != activeRobot.topconBattery < 20
+                  ? "text-red-500 animate-pulse"
+                  : "text-emerald-500"
+              }
+            />
+            <span className="text-[12px] font-black text-white">
+              {activeRobot.topconBattery != null
+                ? activeRobot.topconBattery.toFixed(0)
+                : '-'}%
             </span>
           </div>
         </div>
 
-        <div className="flex bg-zinc-900 p-0.5 rounded-sm border border-zinc-700">
-          <button
-            onClick={() => {
-              setControlType("AUTO");
-              addLog("MODO NAVEGACIÓN: AUTÓNOMO", "info", "CTRL");
-            }}
-            className={`flex-1 py-2 rounded-sm text-[9px] font-black transition-all ${
-              controlType === "AUTO"
-                ? "bg-zinc-800 text-orange-500"
-                : "text-zinc-600 hover:text-zinc-400"
-            }`}
-          >
-            AUTO
-          </button>
-
-          <button
-            onClick={() => {
-              setControlType("MANUAL");
-              addLog("MODO NAVEGACIÓN: MANUAL (RC_READY)", "warn", "CTRL");
-            }}
-            className={`flex-1 py-2 rounded-sm text-[9px] font-black transition-all ${
-              controlType === "MANUAL"
-                ? "bg-orange-500 text-zinc-950 shadow-md"
-                : "text-zinc-600 hover:text-zinc-400"
-            }`}
-          >
-            MANUAL
-          </button>
-        </div>
-
-        <div className="p-3 bg-zinc-900 rounded-sm border border-zinc-800 flex flex-col items-center">
-          <Joystick onMove={setMoveVector} />
-          <span className="text-[7px] font-bold text-zinc-600 mt-2 uppercase">
-            Joystick Remoto
-          </span>
-        </div>
+        <AlarmPanel alarms={alarms} />
 
         <div className="mt-auto flex flex-col gap-1.5">
           <HUDButton variant="warning" className="w-full py-2 uppercase">

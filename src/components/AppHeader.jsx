@@ -5,6 +5,10 @@ import {
   RotateCcw,
   ChevronDown,
   Target,
+  LogOut,
+  Users,
+  Bot,
+  Siren,
 } from "lucide-react";
 import RobotStatusGroup from "./RobotStatusGroup";
 
@@ -29,9 +33,31 @@ export default function AppHeader({
   setSelectedStationId,
   activeStation,
 
+  // auth
+  userInfo,
+
+  onOpenUserManagement,
+  onOpenRobotManagement,
+  alarms = [],
+
   // logging
   addLog,
 }) {
+
+  const activeAlarms = alarms.filter((a) => a.active && a.level !== "OK");
+  const errorCount = activeAlarms.filter((a) => a.level === "ERROR").length;
+  const warnCount = activeAlarms.filter((a) => a.level === "WARN").length;
+  const staleCount = activeAlarms.filter((a) => a.level === "STALE").length;
+
+  const alarmColor =
+    errorCount > 0
+      ? "text-red-400 border-red-900/50"
+      : warnCount > 0
+      ? "text-amber-400 border-amber-900/50"
+      : staleCount > 0
+      ? "text-zinc-300 border-zinc-700"
+      : "text-emerald-400 border-emerald-900/50";
+
   return (
     <header className="h-16 border-b border-zinc-800 bg-zinc-900 flex items-center justify-between px-6 z-[110] shadow-md shrink-0">
       <div className="flex items-center gap-4 h-full">
@@ -241,6 +267,62 @@ export default function AppHeader({
             </div>
           )}
         </div>
+      </div>
+      {/* USERS */}
+      <div className="flex items-center gap-3 shrink-0">
+        {userInfo?.email && (
+          <div className="hidden md:flex flex-col items-end leading-none">
+            <span className="text-[8px] text-zinc-500 font-bold uppercase">
+              Usuario
+            </span>
+            <span className="text-[10px] text-zinc-300 font-bold">
+              {userInfo.email}
+            </span>
+          </div>
+        )}
+
+        <div
+          className={`h-10 px-3 flex items-center gap-2 border rounded-sm bg-zinc-800 ${alarmColor}`}
+          title="Resumen de alarmas"
+        >
+          <Siren size={16} />
+          <span className="text-[9px] font-black uppercase">
+            {activeAlarms.length === 0
+              ? "Sin alarmas"
+              : `${activeAlarms.length} alarmas`}
+          </span>
+        </div>
+
+        {userInfo?.admin && (
+        <>
+          <button
+            title="Gestión de usuarios"
+            onClick={onOpenUserManagement}
+            className="h-10 px-3 flex items-center gap-2 border rounded-sm transition-colors bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-orange-500 hover:text-orange-400"
+          >
+            <Users size={16} />
+            <span className="text-[9px] font-black uppercase">Usuarios</span>
+          </button>
+
+          <button
+            title="Gestión de robots"
+            onClick={onOpenRobotManagement}
+            className="h-10 px-3 flex items-center gap-2 border rounded-sm transition-colors bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-orange-500 hover:text-orange-400"
+          >
+            <Bot size={16} />
+            <span className="text-[9px] font-black uppercase">Robots</span>
+          </button>
+        </>
+      )}
+        
+        <button
+          title="Cerrar sesión"
+          onClick={() => (window.location.href = "/auth/logout")}
+          className="h-10 px-3 flex items-center gap-2 border rounded-sm transition-colors bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-red-500 hover:text-red-400"
+        >
+          <LogOut size={16} />
+          <span className="text-[9px] font-black uppercase">Logout</span>
+        </button>
       </div>
     </header>
   );
