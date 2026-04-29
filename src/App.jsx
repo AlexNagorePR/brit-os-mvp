@@ -16,6 +16,7 @@ import RightPanel from './components/RightPanel';
 import LoginScreen from './components/LoginScreen';
 import UserManagementScreen from './components/UserManagementScreen';
 import RobotManagementScreen from './components/RobotManagementScreen';
+import ClientManagementScreen from './components/ClientManagementScreen';
 import Joystick from "./components/Joystick";
 
 import { STATIONS_DATA } from './data/stations';
@@ -36,6 +37,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
   const [currentScreen, setCurrentScreen] = useState('dashboard');
+  const [clients, setClients] = useState([]);
 
   const [projectName] = useState('TORRE_NORTE_N3');
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
@@ -193,7 +195,7 @@ export default function App() {
       try {
         setFleetLoading(true);
 
-        const res = await fetch('/api/devices/', { credentials: 'include' });
+        const res = await fetch('/api/devices', { credentials: 'include' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         let devices = await res.json();
@@ -202,8 +204,9 @@ export default function App() {
         const normalized = (devices || []).map((d, idx) => ({
           id: d.id ?? "",
           name: d.name ?? d.id,
+          online: Boolean(d.online ?? d.status === 'online'),
           hostname: d.hostname ?? null,
-          status: d.status ?? null,
+          status: d.status ?? (d.online === false ? 'offline' : d.online ? 'online' : null),
           health: d.health ?? null,
           battery: d.battery ?? null,
           voltage: d.voltage ?? null,
@@ -246,6 +249,30 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    async function loadClients() {
+    try {
+      const res = await fetch('/admin/clients', {
+        credentials: 'include'
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setClients(Array.isArray(data) ? data : data.clients || []);
+    } catch (err) {
+      console.error('LOAD CLIENTS ERROR:', err);
+      addLog?.(`ERROR cargando clientes: ${String(err)}`, 'error', 'API');
+    }
+  }
+
+    loadClients();
+  }, [isAuthenticated]);
   useEffect(() => {
     if (!isAuthenticated || fleetData.length === 0) return;
     loadAllRobotsTelemetry();
@@ -342,14 +369,6 @@ export default function App() {
     );
   }
 
-  if (!activeRobot) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-zinc-950 text-zinc-400">
-        No hay devices
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-300 font-sans overflow-hidden select-none text-[10px]">
       <AppHeader
@@ -370,6 +389,7 @@ export default function App() {
         userInfo={userInfo}
         onOpenUserManagement={() => setCurrentScreen('users')}
         onOpenRobotManagement={() => setCurrentScreen('robots')}
+        onOpenClientManagement={() => setCurrentScreen('clients')}
         alarms={alarms}
         addLog={addLog}
       />
@@ -382,6 +402,12 @@ export default function App() {
         />
       ) : currentScreen === 'robots' ? (
         <RobotManagementScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          addLog={addLog}
+          clients={clients}
+        />
+      ) : currentScreen === 'clients' ? (
+        <ClientManagementScreen
           onBack={() => setCurrentScreen('dashboard')}
           addLog={addLog}
         />

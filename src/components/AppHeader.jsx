@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Settings,
   Sliders,
@@ -9,6 +10,7 @@ import {
   Users,
   Bot,
   Siren,
+  Building,
 } from "lucide-react";
 import RobotStatusGroup from "./RobotStatusGroup";
 
@@ -38,6 +40,7 @@ export default function AppHeader({
 
   onOpenUserManagement,
   onOpenRobotManagement,
+  onOpenClientManagement,
   alarms = [],
 
   // logging
@@ -48,6 +51,8 @@ export default function AppHeader({
   const errorCount = activeAlarms.filter((a) => a.level === "ERROR").length;
   const warnCount = activeAlarms.filter((a) => a.level === "WARN").length;
   const staleCount = activeAlarms.filter((a) => a.level === "STALE").length;
+
+  const [isManagementOpen, setIsManagementOpen] = useState(false);
 
   const alarmColor =
     errorCount > 0
@@ -125,21 +130,23 @@ export default function AppHeader({
           >
             <div
               className={`w-2 h-2 rounded-full ${
-                activeRobot.status === "online"
+                activeRobot?.online === true
                   ? "bg-emerald-500 shadow-[0_0_5px_#10b981]"
-                  : "bg-red-500"
+                  : activeRobot
+                  ? "bg-red-500"
+                  : "bg-zinc-600"
               }`}
             />
             <div className="flex flex-col items-start leading-none flex-1 text-left">
               <span className="text-[10px] font-black text-white uppercase">
-                {activeRobot.name}
+                {activeRobot?.name || "Sin dispositivos"}
               </span>
               <span className="text-[8px] text-zinc-500 font-bold uppercase">
-                {activeRobot.id}
+                {activeRobot?.id || "No hay robots disponibles"}
               </span>
             </div>
 
-            <RobotStatusGroup robot={activeRobot} />
+            {activeRobot && <RobotStatusGroup robot={activeRobot} />}
             <ChevronDown
               size={14}
               className={`text-zinc-500 ml-2 ${isFleetOpen ? "rotate-180" : ""}`}
@@ -148,32 +155,38 @@ export default function AppHeader({
 
           {isFleetOpen && (
             <div className="absolute top-full left-0 mt-2 w-full bg-zinc-900 border border-zinc-600 z-[120] shadow-2xl p-1 rounded-sm">
-              {fleetData.map((r) => (
-                <div
-                  key={r.id}
-                  onClick={() => {
-                    setSelectedRobotId(r.id);
-                    setIsFleetOpen(false);
-                    addLog(`FOCO CAMBIADO A ${r.id}`, "info", "UI");
-                  }}
-                  className={`p-2.5 flex items-center gap-4 cursor-pointer hover:bg-zinc-800 ${
-                    selectedRobotId === r.id ? "bg-zinc-800/50" : ""
-                  }`}
-                >
-                  <span
-                    className={`text-[9px] font-bold w-20 ${
-                      selectedRobotId === r.id
-                        ? "text-orange-400"
-                        : "text-zinc-300"
+              {fleetData.length > 0 ? (
+                fleetData.map((r) => (
+                  <div
+                    key={r.id}
+                    onClick={() => {
+                      setSelectedRobotId(r.id);
+                      setIsFleetOpen(false);
+                      addLog(`FOCO CAMBIADO A ${r.id}`, "info", "UI");
+                    }}
+                    className={`p-2.5 flex items-center gap-4 cursor-pointer hover:bg-zinc-800 ${
+                      selectedRobotId === r.id ? "bg-zinc-800/50" : ""
                     }`}
                   >
-                    {r.name}
-                  </span>
-                  <div className="flex-1">
-                    <RobotStatusGroup robot={r} compact={true} />
+                    <span
+                      className={`text-[9px] font-bold w-20 ${
+                        selectedRobotId === r.id
+                          ? "text-orange-400"
+                          : "text-zinc-300"
+                      }`}
+                    >
+                      {r.name}
+                    </span>
+                    <div className="flex-1">
+                      <RobotStatusGroup robot={r} compact={true} />
+                    </div>
                   </div>
+                ))
+              ) : (
+                <div className="p-2.5 flex items-center justify-center text-zinc-500">
+                  <span className="text-[9px] font-bold">Sin dispositivos disponibles</span>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
@@ -294,26 +307,75 @@ export default function AppHeader({
         </div>
 
         {userInfo?.admin && (
-        <>
-          <button
-            title="Gestión de usuarios"
-            onClick={onOpenUserManagement}
-            className="h-10 px-3 flex items-center gap-2 border rounded-sm transition-colors bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-orange-500 hover:text-orange-400"
-          >
-            <Users size={16} />
-            <span className="text-[9px] font-black uppercase">Usuarios</span>
-          </button>
+          <div className="relative">
+            <button
+              title="Menú de gestión"
+              onClick={() => setIsManagementOpen(!isManagementOpen)}
+              className={`h-10 px-3 flex items-center gap-2 border rounded-sm transition-colors ${
+                isManagementOpen
+                  ? "bg-orange-500 text-zinc-900 border-orange-600"
+                  : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-orange-500 hover:text-orange-400"
+              }`}
+            >
+              <span className="text-[9px] font-black uppercase">Gestión</span>
+              <ChevronDown 
+                size={14}
+                className={`transition-transform ${isManagementOpen ? "rotate-180" : ""}`}
+              />
+            </button>
 
-          <button
-            title="Gestión de robots"
-            onClick={onOpenRobotManagement}
-            className="h-10 px-3 flex items-center gap-2 border rounded-sm transition-colors bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-orange-500 hover:text-orange-400"
-          >
-            <Bot size={16} />
-            <span className="text-[9px] font-black uppercase">Robots</span>
-          </button>
-        </>
-      )}
+            {isManagementOpen && (
+              <div className="absolute top-full right-0 mt-2 w-40 bg-zinc-900 border border-zinc-700 z-[120] p-1 shadow-2xl rounded-sm">
+                <div className="grid grid-cols-1 gap-0.5">
+                  <button
+                    title="Gestión de clientes"
+                    onClick={() => {
+                      onOpenClientManagement();
+                      setIsManagementOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-zinc-800 text-[9px] font-bold uppercase transition-colors group"
+                  >
+                    <Building
+                      size={14}
+                      className="text-zinc-500 group-hover:text-orange-500"
+                    />
+                    <span>Clientes</span>
+                  </button>
+
+                  <button
+                    title="Gestión de usuarios"
+                    onClick={() => {
+                      onOpenUserManagement();
+                      setIsManagementOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-zinc-800 text-[9px] font-bold uppercase transition-colors group"
+                  >
+                    <Users
+                      size={14}
+                      className="text-zinc-500 group-hover:text-orange-500"
+                    />
+                    <span>Usuarios</span>
+                  </button>
+
+                  <button
+                    title="Gestión de robots"
+                    onClick={() => {
+                      onOpenRobotManagement();
+                      setIsManagementOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-zinc-800 text-[9px] font-bold uppercase transition-colors group"
+                  >
+                    <Bot
+                      size={14}
+                      className="text-zinc-500 group-hover:text-orange-500"
+                    />
+                    <span>Robots</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         
         <button
           title="Cerrar sesión"

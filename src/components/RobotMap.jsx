@@ -37,7 +37,7 @@ export default function RobotMap({ mode, controlType, layers, fleetData, selecte
           </g>
         ))}
 
-        {fleetData.map(robot => robot.status !== 'offline' && (
+        {fleetData.map(robot => robot.online !== false && robot.status !== 'offline' && (
           <g key={robot.id} transform={`translate(${robot.pos.x}, ${robot.pos.y}) rotate(${robot.heading || 0})`}>
             {mode === 'track' ? (
               <g>

@@ -1,49 +1,125 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, RefreshCw, UserPlus, Shield, ShieldCheck } from "lucide-react";
 
-function normalizeUser(raw) {
+function normalizeUser(raw, source = "unknown") {
   const attrs = Array.isArray(raw?.attributes)
     ? Object.fromEntries(
         raw.attributes
-          .filter((a) => a?.name)
-          .map((a) => [a.name, a.value])
+          .filter((a) => a?.name || a?.Name)
+          .map((a) => [a.name ?? a.Name, a.value ?? a.Value])
       )
     : raw?.attributes && typeof raw.attributes === "object"
     ? raw.attributes
     : {};
 
+  const username =
+    raw?.username ??
+    raw?.Username ??
+    raw?.userName ??
+    raw?.id ??
+    "";
+
+  const email =
+    raw?.email ??
+    attrs.email ??
+    "";
+
   return {
-    username:
-      raw?.username ??
-      raw?.Username ??
-      raw?.userName ??
-      raw?.email ??
-      attrs.email ??
-      "",
-    email:
-      raw?.email ??
-      attrs.email ??
-      raw?.Username ??
-      raw?.username ??
-      "",
+    id: raw?.id ?? username,
+    username,
+    email,
     enabled:
       raw?.enabled ??
       raw?.Enabled ??
-      raw?.status === "ENABLED",
+      raw?.status === "ENABLED" ??
+      true,
     groups: Array.isArray(raw?.groups) ? raw.groups : [],
     givenName: raw?.givenName ?? attrs.given_name ?? "",
     familyName: raw?.familyName ?? attrs.family_name ?? "",
+    clientId: raw?.clientId ?? raw?.client_id ?? null,
+    source,
+    inCognito: source === "cognito",
+    inDb: source === "db",
     raw,
   };
 }
 
+function extractCognitoUsers(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.cognitoUsers)) return data.cognitoUsers;
+  return [];
+}
+
+function extractDbUsers(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.dbUsers)) return data.dbUsers;
+  if (Array.isArray(data?.users)) return data.users;
+  return [];
+}
+
+function mergeUsers(cognitoUsers, dbUsers) {
+  const combined = new Map();
+
+  dbUsers.forEach((dbUser) => {
+    const normalized = normalizeUser(dbUser, "db");
+    const key = normalized.username || normalized.id || normalized.email;
+    if (!key) return;
+
+    combined.set(key, {
+      ...normalized,
+      inDb: true,
+      inCognito: false,
+    });
+  });
+
+  cognitoUsers.forEach((cognitoUser) => {
+    const normalized = normalizeUser(cognitoUser, "cognito");
+    const key = normalized.username || normalized.id || normalized.email;
+    if (!key) return;
+
+    const existing = combined.get(key);
+
+    if (!existing) {
+      combined.set(key, {
+        ...normalized,
+        inCognito: true,
+        inDb: false,
+      });
+      return;
+    }
+
+    combined.set(key, {
+      ...normalized,
+      ...existing,
+      id: existing.id || normalized.id,
+      username: existing.username || normalized.username,
+      email: existing.email || normalized.email,
+      enabled: normalized.enabled,
+      groups: normalized.groups,
+      givenName: normalized.givenName || existing.givenName,
+      familyName: normalized.familyName || existing.familyName,
+      clientId: existing.clientId ?? normalized.clientId ?? null,
+      inCognito: true,
+      inDb: true,
+      raw: {
+        cognito: normalized.raw,
+        db: existing.raw,
+      },
+    });
+  });
+
+  return Array.from(combined.values());
+}
+
 export default function UserManagementScreen({ onBack, addLog, userInfo }) {
   const [users, setUsers] = useState([]);
+  const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingGroupsFor, setSavingGroupsFor] = useState(null);
   const [togglingUser, setTogglingUser] = useState(null);
   const [creatingUser, setCreatingUser] = useState(false);
   const [error, setError] = useState("");
+  const [savingClientFor, setSavingClientFor] = useState(null);
 
   const [form, setForm] = useState({
     email: "",
@@ -52,6 +128,7 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
     temporaryPassword: "",
     allowed: true,
     admin: false,
+    clientId: "",
   });
 
   async function loadUsers() {
@@ -59,7 +136,50 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
       setLoading(true);
       setError("");
 
-      const res = await fetch("/admin/users", {
+      const [usersRes, dbRes] = await Promise.all([
+        fetch("/admin/users", { credentials: "include" }),
+        fetch("/admin/db-users", { credentials: "include" }),
+      ]);
+
+      if (!usersRes.ok) {
+        const data = await usersRes.json().catch(() => null);
+        throw new Error(data?.error || `HTTP ${usersRes.status}`);
+      }
+
+      const usersData = await usersRes.json();
+      const dbData = dbRes.ok ? await dbRes.json() : null;
+
+      const cognitoUsers = extractCognitoUsers(usersData);
+
+      const dbUsersFromAdminUsers = extractDbUsers(usersData);
+      const dbUsersFromDbEndpoint = extractDbUsers(dbData);
+
+      const dbUsers =
+        dbUsersFromDbEndpoint.length > 0
+          ? dbUsersFromDbEndpoint
+          : dbUsersFromAdminUsers;
+
+      const merged = mergeUsers(cognitoUsers, dbUsers);
+
+      setUsers(merged);
+
+      addLog?.(
+        `USUARIOS CARGADOS: ${merged.length} (BD: ${dbUsers.length}, Cognito: ${cognitoUsers.length})`,
+        "success",
+        "ADMIN"
+      );
+    } catch (err) {
+      console.error("USERS LOAD ERROR", err);
+      setError("No se pudieron cargar los usuarios.");
+      addLog?.(`ERROR cargando usuarios: ${String(err)}`, "error", "ADMIN");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadClients() {
+    try {
+      const res = await fetch("/admin/clients", {
         credentials: "include",
       });
 
@@ -68,20 +188,19 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
       }
 
       const data = await res.json();
-      const normalized = Array.isArray(data) ? data.map(normalizeUser) : [];
-      setUsers(normalized);
-      addLog?.(`USUARIOS CARGADOS: ${normalized.length}`, "success", "ADMIN");
+      const normalized = Array.isArray(data)
+        ? data.map((c) => ({ id: c?.id ?? "", name: c?.name ?? "" }))
+        : [];
+      setClients(normalized);
     } catch (err) {
-      console.error("USERS LOAD ERROR", err);
-      setError("No se pudieron cargar los usuarios.");
-      addLog?.(`ERROR /admin/users: ${String(err)}`, "error", "ADMIN");
-    } finally {
-      setLoading(false);
+      console.error("CLIENTS LOAD ERROR", err);
+      addLog?.(`ERROR /admin/clients: ${String(err)}`, "error", "ADMIN");
     }
   }
 
   useEffect(() => {
     loadUsers();
+    loadClients();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -108,6 +227,7 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
           familyName: form.familyName || undefined,
           temporaryPassword: form.temporaryPassword || undefined,
           groups,
+          clientId: form.clientId || null,
         }),
       });
 
@@ -123,6 +243,7 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
         temporaryPassword: "",
         allowed: true,
         admin: false,
+        clientId: "",
       });
 
       addLog?.(`USUARIO CREADO: ${form.email}`, "success", "ADMIN");
@@ -180,31 +301,31 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
   }
 
   async function deleteUser(user) {
-    const username = user.email;
-    const confirmed = window.confirm(`¿Eliminar usuario ${username}?`);
+    const username = user.username;
+    const confirmed = window.confirm(`¿Eliminar usuario ${user.email || username}?`);
     if (!confirmed) return;
 
     try {
-        const res = await fetch(`/admin/users/${encodeURIComponent(username)}`, {
-            method: 'DELETE',
-            credentials: 'include',
-        });
+      const res = await fetch(`/admin/users/${encodeURIComponent(username)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
 
-        const data = await res.json().catch(() => null);
-        
-        if (!res.ok) {
-            if (data?.error === "cannot_delete_self") {
-                throw new Error("No puedes eliminar tu propio usuario.");
-            }
-            throw new Error(data?.error || `HTTP ${res.status}`);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        if (data?.error === "cannot_delete_self") {
+          throw new Error("No puedes eliminar tu propio usuario.");
         }
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
 
-        addLog?.(`USUARIO ELIMINADO: ${username}`, "warn", "ADMIN");
-        await loadUsers();
+      addLog?.(`USUARIO ELIMINADO: ${username}`, "warn", "ADMIN");
+      await loadUsers();
     } catch (err) {
-        console.error('DELETE USER ERROR', err);
-        setError(`No se pudo eliminar el usuario: ${String(err.message || err)}`);
-        addLog?.(`USUARIO ELIMINADO: ${username}`, "warn", "ADMIN");
+      console.error("DELETE USER ERROR", err);
+      setError(`No se pudo eliminar el usuario: ${String(err.message || err)}`);
+      addLog?.(`ERROR eliminando usuario ${username}: ${String(err)}`, "error", "ADMIN");
     }
   }
 
@@ -245,6 +366,49 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
       addLog?.(`ERROR estado usuario ${user.username}: ${String(err)}`, "error", "ADMIN");
     } finally {
       setTogglingUser(null);
+    }
+  }
+
+  async function saveUserClient(user, clientId) {
+    try {
+      setSavingClientFor(user.username);
+      setError("");
+      
+      const res = await fetch(
+        `/admin/users/${encodeURIComponent(user.username)}/client`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            clientId: clientId || null,
+          }),
+        }
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+
+      const clientName = clients.find(c => c.id === clientId)?.name || "Sin cliente";
+
+      addLog?.(
+        `CLIENTE ACTUALIZADO: ${user.username} -> ${clientName || "Sin cliente"}`,
+        "success",
+        "ADMIN"
+      );
+
+      await loadUsers();
+    } catch (err) {
+      console.error("SAVE USER CLIENT ERROR", err);
+      setError(`No se pudo actualizar el cliente: ${String(err.message || err)}`);
+      addLog?.(`ERROR cliente usuario ${user.username}: ${String(err)}`, "error", "ADMIN");
+    } finally {
+      setSavingClientFor(null);
     }
   }
 
@@ -350,6 +514,24 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
                   />
                 </div>
 
+                <div>
+                  <label className="block mb-1 text-[8px] font-bold uppercase text-zinc-500">
+                    Cliente (opcional)
+                  </label>
+                  <select
+                    value={form.clientId}
+                    onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-sm px-3 py-2 text-[12px] text-white outline-none focus:border-orange-500"
+                  >
+                    <option value="">Sin cliente</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="space-y-2 pt-1">
                   <label className="flex items-center gap-2 text-[11px] text-zinc-300">
                     <input
@@ -384,10 +566,11 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
           {/* LISTADO */}
           <div className="min-h-0 overflow-y-auto custom-scrollbar">
             <div className="border border-zinc-800 rounded-sm overflow-hidden">
-              <div className="grid grid-cols-[2fr_1fr_1fr_220px] gap-3 px-4 py-2 bg-zinc-950 text-[8px] font-black uppercase text-zinc-500 border-b border-zinc-800">
+              <div className="grid grid-cols-[2fr_1fr_1fr_1.2fr_220px] gap-3 px-4 py-2 bg-zinc-950 text-[8px] font-black uppercase text-zinc-500 border-b border-zinc-800">
                 <span>Usuario</span>
                 <span>Estado</span>
                 <span>Grupos</span>
+                <span>Cliente</span>
                 <span>Acciones</span>
               </div>
 
@@ -403,7 +586,7 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
                   return (
                     <div
                       key={user.username}
-                      className="grid grid-cols-[2fr_1fr_1fr_220px] gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/40 items-center"
+                      className="grid grid-cols-[2fr_1fr_1fr_1.2fr_220px] gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/40 items-center"
                     >
                       <div className="min-w-0">
                         <div className="text-[12px] font-bold text-white truncate">
@@ -458,6 +641,24 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
                           <ShieldCheck size={12} className="text-orange-400" />
                           admin
                         </label>
+                      </div>
+
+                      <div className="min-w-0">
+                        <select
+                          value={user.clientId || ""}
+                          onChange={(e) =>
+                            saveUserClient(user, e.target.value || null)
+                          }
+                          disabled={savingClientFor === user.username}
+                          className="w-full bg-zinc-900 border border-zinc-700 rounded-sm px-3 py-2 text-[12px] text-white outline-none focus:border-orange-500 disabled:opacity-50"
+                        >
+                          <option value="">Sin cliente</option>
+                          {clients.map((client) => (
+                            <option key={client.id} value={client.id}>
+                              {client.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
                       <div className="flex items-center gap-2">

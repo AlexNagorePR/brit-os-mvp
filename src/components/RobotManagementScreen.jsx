@@ -6,47 +6,13 @@ function normalizeRobot(raw) {
     id: raw?.id ?? "",
     hostname: raw?.hostname ?? "",
     name: raw?.name ?? raw?.hostname ?? raw?.id ?? "",
+    clientId: raw?.clientId ?? "",
+    clientName: raw?.clientName ?? "",
     raw,
   };
 }
 
-function normalizeUser(raw) {
-  const attrs = Array.isArray(raw?.attributes)
-    ? Object.fromEntries(
-        raw.attributes
-          .filter((a) => a?.name)
-          .map((a) => [a.name, a.value])
-      )
-    : raw?.attributes && typeof raw.attributes === "object"
-    ? raw.attributes
-    : {};
-
-  return {
-    username:
-      raw?.username ??
-      raw?.Username ??
-      raw?.userName ??
-      raw?.email ??
-      attrs.email ??
-      "",
-    email:
-      raw?.email ??
-      attrs.email ??
-      raw?.Username ??
-      raw?.username ??
-      "",
-    enabled:
-      raw?.enabled ??
-      raw?.Enabled ??
-      raw?.status === "ENABLED",
-    groups: Array.isArray(raw?.groups) ? raw.groups : [],
-    givenName: raw?.givenName ?? attrs.given_name ?? "",
-    familyName: raw?.familyName ?? attrs.family_name ?? "",
-    raw,
-  };
-}
-
-export default function RobotManagementScreen({ onBack, addLog }) {
+export default function RobotManagementScreen({ onBack, addLog, clients = [] }) {
   const [robots, setRobots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -92,6 +58,53 @@ export default function RobotManagementScreen({ onBack, addLog }) {
     loadRobots();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function saveRobotClient(robot, clientName) {
+    try {
+      setSavingRobotId(robot.id);
+      setError("");
+
+      const res = await fetch(
+        `/admin/robots/${encodeURIComponent(robot.id)}/client`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            clientName: clientName || null,
+          }),
+        }
+      );
+
+      const data = await res.json().catch(() => null);
+      
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+
+      setRobots((prev) =>
+        prev.map((r) =>
+          r.id === robot.id
+            ? {
+              ...r,
+              clientId: data?.clientId ?? null,
+              clientName: data?.clientName ?? null,
+            }
+            : r
+        )
+      );
+
+      addLog?.(`ROBOT ACTUALIZADO: ${robot.id} -> ${clientName || "Sin cliente"}`, "success", "ADMIN");
+    } catch (err) {
+      console.error("SAVE ROBOT CLIENT ERROR", err);
+      setError(`No se pudo actualizar el cliente del robot: ${String(err.message || err)}`);
+      addLog?.(`ERROR save robot client ${robot.id}: ${String(err)}`, "error", "ADMIN");
+    } finally {
+      setSavingRobotId(null);
+    }
+  }
   
   async function handleSyncRobots() {
     try {
@@ -133,7 +146,9 @@ export default function RobotManagementScreen({ onBack, addLog }) {
 
   async function loadAllUsers() {
     try {
-      const res = await fetch("/admin/users", {
+      setError("");
+      
+      const res = await fetch("/admin/db-users", {
         credentials: "include",
       });
 
@@ -143,7 +158,20 @@ export default function RobotManagementScreen({ onBack, addLog }) {
       }
 
       const data = await res.json();
-      const normalized = Array.isArray(data) ? data.map(normalizeUser) : [];
+      
+      const usersArray = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.users)
+        ? data.users
+        : [];
+        
+      const normalized = usersArray.map((u)=>({
+        id: u.id,
+        username: u.id,
+        email: u.email,
+        clientId: u.clientId,
+      }));
+
       setAllUsers(normalized);
     } catch (err) {
       console.error("LOAD ALL USERS ERROR", err);
@@ -172,6 +200,9 @@ export default function RobotManagementScreen({ onBack, addLog }) {
       }
 
       const data = await res.json();
+
+      console.log(`ROBOT USERS DATA [${robot.id}]:`, data);
+      addLog?.(`USUARIOS DEL ROBOT: ${JSON.stringify(data)}`, "info", "ADMIN");
 
       setEditingUsersRobotId(robot.id);
       setSelectedUserIds(Array.isArray(data?.userIds) ? data.userIds : []);
@@ -338,10 +369,11 @@ export default function RobotManagementScreen({ onBack, addLog }) {
 
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4">
           <div className="border border-zinc-800 rounded-sm overflow-hidden">
-            <div className="grid grid-cols-[180px_1.2fr_1.2fr_320px_220px] gap-3 px-4 py-2 bg-zinc-950 text-[8px] font-black uppercase text-zinc-500 border-b border-zinc-800">
+            <div className="grid grid-cols-[180px_1.1fr_1.1fr_220px_300px_220px] gap-3 px-4 py-2 bg-zinc-950 text-[8px] font-black uppercase text-zinc-500 border-b border-zinc-800">
               <span>ID</span>
               <span>Hostname</span>
               <span>Nombre visible</span>
+              <span>Cliente</span>
               <span>Usuarios asignados</span>
               <span>Acciones</span>
             </div>
@@ -355,10 +387,14 @@ export default function RobotManagementScreen({ onBack, addLog }) {
                 const isEditing = editingRobotId === robot.id;
                 const isSaving = savingRobotId === robot.id;
 
+                const assignableUsers = robot.clientId
+                  ? allUsers.filter((u) => u.clientId === robot.clientId)
+                  : [];
+
                 return (
                   <div
                     key={robot.id}
-                    className="grid grid-cols-[180px_1.2fr_1.2fr_320px_220px] gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/40 items-center"
+                    className="grid grid-cols-[180px_1.1fr_1.1fr_220px_300px_220px] gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/40 items-center"
                   >
                     <div className="min-w-0 text-[11px] text-zinc-300 font-mono truncate">
                       {robot.id}
@@ -383,12 +419,28 @@ export default function RobotManagementScreen({ onBack, addLog }) {
                     </div>
 
                     <div className="min-w-0">
+                      <select
+                        value={robot.clientName || ""}
+                        disabled={savingRobotId === robot.id}
+                        onChange={(e) => saveRobotClient(robot, e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-700 rounded-sm px-3 py-2 text-[11px] text-white outline-none focus:border-orange-500 disabled:opacity-50"
+                      >
+                        <option value="">Sin cliente</option>
+                        {clients.map((client) => (
+                          <option key={client.id} value={client.name}>
+                            {client.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="min-w-0">
                       {editingUsersRobotId === robot.id ? (
                         <div className="border border-zinc-700 rounded-sm bg-zinc-950 p-2 max-h-40 overflow-y-auto custom-scrollbar space-y-2">
-                          {allUsers.length === 0 ? (
+                          {assignableUsers.length === 0 ? (
                             <div className="text-[11px] text-zinc-500">No hay usuarios disponibles.</div>
                           ) : (
-                            allUsers.map((user) => {
+                            assignableUsers.map((user) => {
                               const userId = user.email || user.username;
                               const checked = selectedUserIds.includes(userId);
 

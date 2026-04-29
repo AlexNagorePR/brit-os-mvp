@@ -38,7 +38,9 @@ export default function RightPanel({
           isRightPanelOpen ? "opacity-100" : "opacity-0"
         }`}
       >
-        <HUDPanel title="Telemetría">
+        {activeRobot ? (
+          <>
+            <HUDPanel title="Telemetría">
           <div className="space-y-2">
             <div className="flex justify-between items-center text-[8px] uppercase font-bold text-zinc-500">
               <span>Estado</span>
@@ -146,20 +148,28 @@ export default function RightPanel({
             <Wrench size={12} /> Mantenimiento
           </HUDButton>
 
-          <button
-            onClick={() =>
-              addLog("¡PARADA DE EMERGENCIA ACTIVADA!", "error", "SYS")
-            }
-            className="w-full py-3 bg-red-600 text-white rounded-sm flex items-center justify-center gap-2 font-black text-[10px] uppercase border-b-4 border-red-800 active:border-b-0 active:translate-y-1 transition-all"
-          >
-            <Square size={14} fill="currentColor" /> Parada de Emergencia
-          </button>
-        </div>
+              <button
+                onClick={() =>
+                  addLog("¡PARADA DE EMERGENCIA ACTIVADA!", "error", "SYS")
+                }
+                className="w-full py-3 bg-red-600 text-white rounded-sm flex items-center justify-center gap-2 font-black text-[10px] uppercase border-b-4 border-red-800 active:border-b-0 active:translate-y-1 transition-all"
+              >
+                <Square size={14} fill="currentColor" /> Parada de Emergencia
+              </button>
+            </div>
 
-        <div className="hidden">
-          {/* Solo para que el bundler no “pierda” iconos si juegas con tree-shaking */}
-          <Activity />
-        </div>
+            <div className="hidden">
+              {/* Solo para que el bundler no "pierda" iconos si juegas con tree-shaking */}
+              <Activity />
+            </div>
+          </>
+        ) : (
+          <HUDPanel title="Telemetría">
+            <div className="flex items-center justify-center h-full text-zinc-500 text-[9px]">
+              Sin dispositivo activo
+            </div>
+          </HUDPanel>
+        )}
       </aside>
     </div>
   );
