@@ -111,7 +111,7 @@ function mergeUsers(cognitoUsers, dbUsers) {
   return Array.from(combined.values());
 }
 
-export default function UserManagementScreen({ onBack, addLog, userInfo }) {
+export default function UserManagementScreen({ onBack, addLog, userInfo, clients }) {
   const [users, setUsers] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -654,7 +654,7 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
                         >
                           <option value="">Sin cliente</option>
                           {clients.map((client) => (
-                            <option key={client.id} value={client.id}>
+                            <option key={client.id} value={client.name}>
                               {client.name}
                             </option>
                           ))}
