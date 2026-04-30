@@ -111,7 +111,7 @@ function mergeUsers(cognitoUsers, dbUsers) {
   return Array.from(combined.values());
 }
 
-export default function UserManagementScreen({ onBack, addLog, userInfo, clients }) {
+export default function UserManagementScreen({ onBack, addLog, userInfo }) {
   const [users, setUsers] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);

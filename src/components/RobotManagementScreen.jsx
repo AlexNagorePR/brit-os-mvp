@@ -12,7 +12,7 @@ function normalizeRobot(raw) {
   };
 }
 
-export default function RobotManagementScreen({ onBack, addLog, clients}) {
+export default function RobotManagementScreen({ onBack, addLog, clients }) {
   const [robots, setRobots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
