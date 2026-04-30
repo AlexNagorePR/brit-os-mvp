@@ -654,7 +654,7 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
                         >
                           <option value="">Sin cliente</option>
                           {clients.map((client) => (
-                            <option key={client.id} value={client.name}>
+                            <option key={client.id} value={client.id}>
                               {client.name}
                             </option>
                           ))}
