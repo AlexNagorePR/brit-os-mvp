@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, RefreshCw, Bot, Pencil, Save, X, Users } from "lucide-react";
+import RobotDetail from "./RobotDetail";
 
 function normalizeRobot(raw) {
   return {
@@ -25,6 +26,7 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
   const [selectedUserIds, setSelectedUserIds] = useState([]);
   const [savingUsersRobotId, setSavingUsersRobotId] = useState(null);
   const [loadingUsersRobotId, setLoadingUsersRobotId] = useState(null);
+  const [detailRobotId, setDetailRobotId] = useState(null);
 
   async function loadRobots() {
     try {
@@ -316,6 +318,9 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
     return [...robots].sort((a, b) => a.name.localeCompare(b.name));
   }, [robots]);
 
+  const tableGridClass =
+    "grid grid-cols-[minmax(220px,1.2fr)_minmax(220px,1.2fr)_minmax(220px,1fr)_minmax(280px,auto)] gap-3";
+
   return (
     <div className="flex-1 overflow-hidden p-2">
       <div className="h-full bg-zinc-900 border border-zinc-800 rounded-sm shadow-xl flex flex-col">
@@ -369,13 +374,11 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
 
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4">
           <div className="border border-zinc-800 rounded-sm overflow-hidden">
-            <div className="grid grid-cols-[180px_1.1fr_1.1fr_220px_300px_220px] gap-3 px-4 py-2 bg-zinc-950 text-[8px] font-black uppercase text-zinc-500 border-b border-zinc-800">
-              <span>ID</span>
-              <span>Hostname</span>
+            <div className={`${tableGridClass} px-4 py-2 bg-zinc-950 text-[8px] font-black uppercase text-zinc-500 border-b border-zinc-800`}>
               <span>Nombre visible</span>
               <span>Cliente</span>
               <span>Usuarios asignados</span>
-              <span>Acciones</span>
+              <span className="text-right">Acciones</span>
             </div>
 
             {loading ? (
@@ -394,16 +397,8 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
                 return (
                   <div
                     key={robot.id}
-                    className="grid grid-cols-[180px_1.1fr_1.1fr_220px_300px_220px] gap-3 px-4 py-3 border-b border-zinc-800 bg-zinc-900/40 items-center"
+                    className={`${tableGridClass} px-4 py-3 border-b border-zinc-800 bg-zinc-900/40 items-center`}
                   >
-                    <div className="min-w-0 text-[11px] text-zinc-300 font-mono truncate">
-                      {robot.id}
-                    </div>
-
-                    <div className="min-w-0 text-[12px] text-zinc-300 truncate">
-                      {robot.hostname || "-"}
-                    </div>
-
                     <div className="min-w-0">
                       {isEditing ? (
                         <input
@@ -469,7 +464,7 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
                       {isEditing ? (
                         <>
                           <button
@@ -513,6 +508,13 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
                       ) : (
                         <>
                           <button
+                            onClick={() => setDetailRobotId(robot.id)}
+                            className="h-9 px-3 border rounded-sm text-[9px] font-black uppercase bg-zinc-900 border-zinc-700 text-zinc-300 hover:border-cyan-500 hover:text-cyan-400"
+                          >
+                            Detalles
+                          </button>
+
+                          <button
                             onClick={() => startRename(robot)}
                             className="h-9 px-3 border rounded-sm text-[9px] font-black uppercase bg-zinc-900 border-zinc-700 text-zinc-300 hover:border-orange-500 hover:text-orange-400 flex items-center gap-2"
                           >
@@ -538,6 +540,14 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
           </div>
         </div>
       </div>
+
+      {detailRobotId ? (
+        <RobotDetail
+          robotId={detailRobotId}
+          onClose={() => setDetailRobotId(null)}
+          addLog={addLog}
+        />
+      ) : null}
     </div>
   );
 }
