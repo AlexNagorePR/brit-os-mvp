@@ -11,6 +11,7 @@ import {
   Bot,
   Siren,
   Building,
+  Battery,
 } from "lucide-react";
 import RobotStatusGroup from "./RobotStatusGroup";
 
@@ -41,6 +42,7 @@ export default function AppHeader({
   onOpenUserManagement,
   onOpenRobotManagement,
   onOpenClientManagement,
+  onOpenBatteryManagement,
   alarms = [],
 
   // logging
@@ -370,6 +372,21 @@ export default function AppHeader({
                       className="text-zinc-500 group-hover:text-orange-500"
                     />
                     <span>Robots</span>
+                  </button>
+
+                  <button
+                    title="Gestión de baterías"
+                    onClick={() => {
+                      onOpenBatteryManagement();
+                      setIsManagementOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 hover:bg-zinc-800 text-[9px] font-bold uppercase transition-colors group"
+                  >
+                    <Battery
+                      size={14}
+                      className="text-zinc-500 group-hover:text-orange-500"
+                    />
+                    <span>Baterías</span>
                   </button>
                 </div>
               </div>

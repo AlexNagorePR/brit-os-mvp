@@ -17,6 +17,7 @@ import LoginScreen from './components/LoginScreen';
 import UserManagementScreen from './components/UserManagementScreen';
 import RobotManagementScreen from './components/RobotManagementScreen';
 import ClientManagementScreen from './components/ClientManagementScreen';
+import BatteryManagementScreen from './components/BatteryManagementScreen';
 import Joystick from "./components/Joystick";
 
 import { STATIONS_DATA } from './data/stations';
@@ -390,6 +391,7 @@ export default function App() {
         onOpenUserManagement={() => setCurrentScreen('users')}
         onOpenRobotManagement={() => setCurrentScreen('robots')}
         onOpenClientManagement={() => setCurrentScreen('clients')}
+        onOpenBatteryManagement={() => setCurrentScreen('batteries')}
         alarms={alarms}
         addLog={addLog}
       />
@@ -410,6 +412,12 @@ export default function App() {
         <ClientManagementScreen
           onBack={() => setCurrentScreen('dashboard')}
           addLog={addLog}
+        />
+      ) : currentScreen === 'batteries' ? (
+        <BatteryManagementScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          addLog={addLog}
+          clients={clients}
         />
       ) : (
         <div className="flex-1 flex overflow-hidden p-2 gap-2 relative">
