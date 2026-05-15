@@ -44,9 +44,9 @@ function normalizeUser(raw, source = "unknown") {
   };
 }
 
-function extractCognitoUsers(data) {
+function extractIdentityUsers(data) {
   if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.cognitoUsers)) return data.cognitoUsers;
+  if (Array.isArray(data?.identityUsers)) return data.identityUsers;
   return [];
 }
 
@@ -57,7 +57,7 @@ function extractDbUsers(data) {
   return [];
 }
 
-function mergeUsers(cognitoUsers, dbUsers) {
+function mergeUsers(identityUsers, dbUsers) {
   const combined = new Map();
 
   dbUsers.forEach((dbUser) => {
@@ -72,8 +72,8 @@ function mergeUsers(cognitoUsers, dbUsers) {
     });
   });
 
-  cognitoUsers.forEach((cognitoUser) => {
-    const normalized = normalizeUser(cognitoUser, "cognito");
+  identityUsers.forEach((identityUser) => {
+    const normalized = normalizeUser(identityUser, "cognito");
     const key = normalized.username || normalized.id || normalized.email;
     if (!key) return;
 
@@ -102,7 +102,7 @@ function mergeUsers(cognitoUsers, dbUsers) {
       inCognito: true,
       inDb: true,
       raw: {
-        cognito: normalized.raw,
+        identity: normalized.raw,
         db: existing.raw,
       },
     });
@@ -138,7 +138,7 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
 
       const [usersRes, dbRes] = await Promise.all([
         fetch("/admin/users", { credentials: "include" }),
-        fetch("/admin/db-users", { credentials: "include" }),
+        fetch("/admin/users/db-users", { credentials: "include" }),
       ]);
 
       if (!usersRes.ok) {
@@ -149,7 +149,7 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
       const usersData = await usersRes.json();
       const dbData = dbRes.ok ? await dbRes.json() : null;
 
-      const cognitoUsers = extractCognitoUsers(usersData);
+      const identityUsers = extractIdentityUsers(usersData);
 
       const dbUsersFromAdminUsers = extractDbUsers(usersData);
       const dbUsersFromDbEndpoint = extractDbUsers(dbData);
@@ -159,12 +159,12 @@ export default function UserManagementScreen({ onBack, addLog, userInfo }) {
           ? dbUsersFromDbEndpoint
           : dbUsersFromAdminUsers;
 
-      const merged = mergeUsers(cognitoUsers, dbUsers);
+      const merged = mergeUsers(identityUsers, dbUsers);
 
       setUsers(merged);
 
       addLog?.(
-        `USUARIOS CARGADOS: ${merged.length} (BD: ${dbUsers.length}, Cognito: ${cognitoUsers.length})`,
+        `USUARIOS CARGADOS: ${merged.length} (BD: ${dbUsers.length}, Identity: ${identityUsers.length})`,
         "success",
         "ADMIN"
       );

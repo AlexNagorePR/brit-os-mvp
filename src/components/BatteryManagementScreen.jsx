@@ -13,27 +13,31 @@ function normalizeBattery(raw) {
 
 export default function BatteryManagementScreen({ onBack, addLog, clients = [] }) {
   const [batteries, setBatteries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [savingBatteryId, setSavingBatteryId] = useState(null);
   const [editingBatteryId, setEditingBatteryId] = useState(null);
   const [editingSerialNumber, setEditingSerialNumber] = useState("");
+  const [editingStateOfHealth, setEditingStateOfHealth] = useState("");
   const [error, setError] = useState("");
   const [creatingBattery, setCreatingBattery] = useState(false);
   const [newBatteryClientId, setNewBatteryClientId] = useState("");
   const [newBatterySerialNumber, setNewBatterySerialNumber] = useState("");
-  const [selectedClientId, setSelectedClientId] = useState("all");
+  const [selectedClientId, setSelectedClientId] = useState("");
   const [deletingBatteryId, setDeletingBatteryId] = useState(null);
 
   async function loadBatteries(clientId = null) {
     try {
+      if (!clientId) {
+        setBatteries([]);
+        return;
+      }
+
       setLoading(true);
       setError("");
 
       let url = "/admin/batteries";
-      if (clientId && clientId !== "all") {
-        url += `?clientId=${encodeURIComponent(clientId)}`;
-      }
+      url += `?clientId=${encodeURIComponent(clientId)}`;
 
       const res = await fetch(url, {
         credentials: "include",
@@ -221,8 +225,8 @@ export default function BatteryManagementScreen({ onBack, addLog, clients = [] }
           </div>
         </div>
         <button
-          onClick={() => loadBatteries(selectedClientId)}
-          disabled={loading}
+          onClick={() => selectedClientId && loadBatteries(selectedClientId)}
+          disabled={loading || !selectedClientId}
           className="p-2 hover:bg-zinc-800 rounded-sm text-zinc-400 hover:text-emerald-500 disabled:opacity-50 transition-colors"
         >
           <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
@@ -249,7 +253,7 @@ export default function BatteryManagementScreen({ onBack, addLog, clients = [] }
               onChange={(e) => setSelectedClientId(e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 text-zinc-300 px-3 py-2 rounded-sm text-[10px] font-bold focus:outline-none focus:border-orange-500"
             >
-              <option value="all">Todos los clientes</option>
+              <option value="">Seleccionar cliente...</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -307,7 +311,11 @@ export default function BatteryManagementScreen({ onBack, addLog, clients = [] }
           </div>
 
           {/* Batteries List */}
-          {loading ? (
+          {!selectedClientId ? (
+            <div className="flex items-center justify-center p-6 text-zinc-400">
+              Selecciona un cliente para ver sus baterías
+            </div>
+          ) : loading ? (
             <div className="flex items-center justify-center p-6 text-zinc-400">
               Cargando baterías...
             </div>

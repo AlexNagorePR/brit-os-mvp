@@ -5,10 +5,11 @@ import RobotDetail from "./RobotDetail";
 function normalizeRobot(raw) {
   return {
     id: raw?.id ?? "",
-    hostname: raw?.hostname ?? "",
-    name: raw?.name ?? raw?.hostname ?? raw?.id ?? "",
+    hostname: raw?.hostName ?? "",
+    name: raw?.robotName ?? raw?.hostName ?? raw?.id ?? "",
     clientId: raw?.clientId ?? "",
     clientName: raw?.clientName ?? "",
+    userEmails: raw?.userEmails ?? [],
     raw,
   };
 }
@@ -150,7 +151,7 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
     try {
       setError("");
       
-      const res = await fetch("/admin/db-users", {
+      const res = await fetch("/admin/users/db-users", {
         credentials: "include",
       });
 
@@ -192,7 +193,7 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
       setLoadingUsersRobotId(robot.id);
       setError("");
 
-      const res = await fetch(`/admin/robots/${encodeURIComponent(robot.id)}/users`, {
+      const res = await fetch(`/admin/robots/${encodeURIComponent(robot.id)}`, {
         credentials: "include",
       });
 
@@ -207,7 +208,7 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
       addLog?.(`USUARIOS DEL ROBOT: ${JSON.stringify(data)}`, "info", "ADMIN");
 
       setEditingUsersRobotId(robot.id);
-      setSelectedUserIds(Array.isArray(data?.userIds) ? data.userIds : []);
+      setSelectedUserIds(Array.isArray(data?.userEmails) ? data.userEmails : []);
     } catch (err) {
       console.error("LOAD ROBOT USERS ERROR", err);
       setError(`No se pudieron cargar los usuarios del robot: ${String(err.message || err)}`);
@@ -230,14 +231,14 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
       setSavingUsersRobotId(robot.id);
       setError("");
 
-      const res = await fetch(`/admin/robots/${encodeURIComponent(robot.id)}/users`, {
+      const res = await fetch(`/admin/robots/${encodeURIComponent(robot.id)}`, {
         method: "PUT",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userIds: selectedUserIds,
+          userEmails: selectedUserIds,
         }),
       });
 
@@ -321,6 +322,16 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
   const tableGridClass =
     "grid grid-cols-[minmax(220px,1.2fr)_minmax(220px,1.2fr)_minmax(220px,1fr)_minmax(280px,auto)] gap-3";
 
+  if (detailRobotId) {
+    return (
+      <RobotDetail
+        robotId={detailRobotId}
+        onClose={() => setDetailRobotId(null)}
+        addLog={addLog}
+      />
+    );
+  }
+
   return (
     <div className="flex-1 overflow-hidden p-2">
       <div className="h-full bg-zinc-900 border border-zinc-800 rounded-sm shadow-xl flex flex-col">
@@ -393,6 +404,8 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
                 const assignableUsers = robot.clientId
                   ? allUsers.filter((u) => u.clientId === robot.clientId)
                   : [];
+                console.log(`All users:`, allUsers);
+                console.log(`Assignable users for robot ${robot.id} (clientId: ${robot.clientId}):`, assignableUsers);
 
                 return (
                   <div
@@ -540,14 +553,6 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
           </div>
         </div>
       </div>
-
-      {detailRobotId ? (
-        <RobotDetail
-          robotId={detailRobotId}
-          onClose={() => setDetailRobotId(null)}
-          addLog={addLog}
-        />
-      ) : null}
     </div>
   );
 }

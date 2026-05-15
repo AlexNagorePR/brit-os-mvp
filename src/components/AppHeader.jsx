@@ -291,7 +291,7 @@ export default function AppHeader({
               Usuario
             </span>
             <span className="text-[10px] text-zinc-300 font-bold">
-              {userInfo.email}
+              {userInfo.email.split("@")[0]}
             </span>
           </div>
         )}
