@@ -170,11 +170,13 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
         
       const normalized = usersArray.map((u)=>({
         id: u.id,
-        username: u.id,
+        username: u.username,
         email: u.email,
         clientId: u.clientId,
       }));
 
+      console.log("LOAD ALL USERS - usersArray original:", usersArray);
+      console.log("LOAD ALL USERS - normalized:", normalized);
       setAllUsers(normalized);
     } catch (err) {
       console.error("LOAD ALL USERS ERROR", err);
@@ -193,7 +195,7 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
       setLoadingUsersRobotId(robot.id);
       setError("");
 
-      const res = await fetch(`/admin/robots/${encodeURIComponent(robot.id)}`, {
+      const res = await fetch(`/admin/robots/${encodeURIComponent(robot.id)}/users`, {
         credentials: "include",
       });
 
@@ -207,8 +209,10 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
       console.log(`ROBOT USERS DATA [${robot.id}]:`, data);
       addLog?.(`USUARIOS DEL ROBOT: ${JSON.stringify(data)}`, "info", "ADMIN");
 
+      const userIds = Array.isArray(data?.userIds) ? data.userIds : [];
+      console.log(`SETTING SELECTED USER IDS [${robot.id}]:`, userIds);
       setEditingUsersRobotId(robot.id);
-      setSelectedUserIds(Array.isArray(data?.userEmails) ? data.userEmails : []);
+      setSelectedUserIds(userIds);
     } catch (err) {
       console.error("LOAD ROBOT USERS ERROR", err);
       setError(`No se pudieron cargar los usuarios del robot: ${String(err.message || err)}`);
@@ -219,11 +223,14 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
   }
 
   function toggleUserSelection(userId) {
-    setSelectedUserIds((prev) =>
-      prev.includes(userId)
+    console.log("TOGGLE USER:", userId);
+    setSelectedUserIds((prev) => {
+      const newIds = prev.includes(userId)
         ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
-    );
+        : [...prev, userId];
+      console.log("SELECTED IDS AFTER TOGGLE:", newIds);
+      return newIds;
+    });
   }
 
   async function saveRobotUsers(robot) {
@@ -231,14 +238,17 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
       setSavingUsersRobotId(robot.id);
       setError("");
 
-      const res = await fetch(`/admin/robots/${encodeURIComponent(robot.id)}`, {
+      console.log("SAVE ROBOT USERS - selectedUserIds:", selectedUserIds);
+      console.log("SAVE ROBOT USERS - body to send:", { userIds: selectedUserIds });
+
+      const res = await fetch(`/admin/robots/${encodeURIComponent(robot.id)}/users`, {
         method: "PUT",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userEmails: selectedUserIds,
+          userIds: selectedUserIds,
         }),
       });
 
@@ -404,9 +414,7 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
                 const assignableUsers = robot.clientId
                   ? allUsers.filter((u) => u.clientId === robot.clientId)
                   : [];
-                console.log(`All users:`, allUsers);
-                console.log(`Assignable users for robot ${robot.id} (clientId: ${robot.clientId}):`, assignableUsers);
-
+           
                 return (
                   <div
                     key={robot.id}
@@ -449,7 +457,7 @@ export default function RobotManagementScreen({ onBack, addLog, clients }) {
                             <div className="text-[11px] text-zinc-500">No hay usuarios disponibles.</div>
                           ) : (
                             assignableUsers.map((user) => {
-                              const userId = user.email || user.username;
+                              const userId = user.id;
                               const checked = selectedUserIds.includes(userId);
 
                               return (
